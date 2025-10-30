@@ -1,0 +1,63 @@
+#define COMP
+#include <def.glsl>
+layout(local_size_x = 256) in;
+void main() {
+  uint i = gl_GlobalInvocationID.x;
+  if (i >= cmn.cnt)
+    return;
+
+  vec4 pv0 = cir[i].pv;
+  vec2 p0 = pv0.xy, v0 = pv0.zw;
+  uvec2 pos = uvec2(p0 * 1e3);
+  vec2 fp = vec2(0), fv = vec2(0);
+  vec4 col0 = cir[i].col;
+  for (uint j = 0; j < 9; ++j) {
+    uvec2 p = pos + grid9[j];
+    p &= uvec2(255);
+    uint id = p.y << 8 | p.x;
+    for (uint k = 0; k < grid[id].cnt; ++k) {
+      vec4 pv1 = grid[id].cir[k].pv;
+      vec4 col1 = grid[id].cir[k].col;
+      vec2 d = p0 - pv1.xy;
+      const float r2 = 1e-6;
+      float d2 = dot(d, d);
+      if (d2 == 0)
+        continue;
+      float t = d2 / r2;
+      float w = exp(-1.5 * t);
+      vec2 dv = pv1.zw - v0;
+      vec2 visc = dv * w * (col0.z + col1.z);
+      fv += visc;
+
+      float p = (1 - t) * w;
+      fp += p * normalize(d);
+    }
+  }
+  vec2 a = vec2(0, .1);
+  a += (fp + fv) * col0.y;
+
+   vec2 d = p0 - cmn.mp;
+   float d2 = dot(d, d);
+   float x = d2 - 1e-4;
+   if (x < 0){
+  	a += d / (x - 1e-6) * 1e-2;
+   }
+
+  vec2 ofst = sin(a * 131071) * 1e-3;
+  vec4 a0 = cir[i].a;
+  //v0 += ofst;
+
+  const float dt = 1e-3;
+  p0 += (v0 + (2 * a0.xy + a) / 6 * dt) * dt;
+
+  vec2 pmin = vec2(2e-3), pmax = vec2(.254, .15);
+  const float k = .5;
+  v0 = mix(mix(v0, -abs(v0) * k, greaterThan(p0, pmax)), abs(v0) * k,
+           lessThan(p0, pmin));
+
+  p0 = clamp(p0, pmin - 1e-3, pmax + 1e-3);
+  v0 += (a0.xy + a) / 2 * dt;
+  a0.xy = a;
+  cir[i].pv = vec4(p0, v0);
+  cir[i].a = a0;
+}
