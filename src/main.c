@@ -1,7 +1,9 @@
 #include "../inc/def.h"
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_vulkan.h>
+#include <spawn.h>
 #include <stdio.h>
+#include <sys/socket.h>
 #include <threads.h>
 #include <vulkan/vulkan_core.h>
 
@@ -62,11 +64,15 @@ static void iter() {
   }
 }
 
-#include <spawn.h>
+static int sv[2];
 int main() {
+  if (-1 == socketpair(AF_UNIX, SOCK_STREAM, 0, sv))
+    return 1;
   pid_t pid;
-  char *argv[] = {"sudo","/bin/fish", 0};
-  //posix_spawnp(&pid, "sudo", 0, 0, argv, 0);
+  char buf[8];
+  sprintf(buf, "%d", sv[1]);
+  char *argv[] = {"sudo", "obj/eth", buf, 0};
+  posix_spawnp(&pid, "sudo", 0, 0, argv, 0);
   extern void crtwin(), crtinst(), crtsrf();
   extern int gpu(void *);
   crtwin();

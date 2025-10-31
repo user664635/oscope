@@ -1,93 +1,74 @@
 #include <arpa/inet.h>
+#include <stdio.h>
 #include <assert.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <netpacket/packet.h>
 #include <signal.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <threads.h>
 #include <unistd.h>
 
+typedef __uint128_t u128;
 typedef uint64_t u64;
 typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t u8;
 typedef _Float32 f32;
 
-volatile bool quit;
-void sigh(int) { quit = 1; }
+static volatile bool run = 1;
+static void sigh(int) { run = 0; }
 
-int sockfd;
-struct {
-  u16 id, loss;
-  u32 seq, t;
-  u16 type;
+static int socketh, ui;
+static const u64 local = 0x222222222222;
+static struct {
+  struct {
+    u128 dst : 48, src : 48, p : 16, seq : 16;
+  };
   u8 data[1500];
-} sbuf = {2, 0, 0, 0, 0x1919, "test"}, rbuf;
+} sbuf = {{2, local, 0x1919, 0}, "test"}, rbuf;
 
-_Atomic u64 compcnt, sbytes, rbytes;
-int comph(void *) {
-  u64 c = 0;
-  while (!quit) {
-    u64 cnt = compcnt++;
-    f32 t = cnt * 1e-3;
-    f32 y = __builtin_sinf(t) + 1;
-    sbuf.data[c] = y * 128;
-    c = c == 1499 ? 0 : c + 1;
+static int sendh(void *) {
+  struct sockaddr_ll addr = {AF_PACKET, 0, 1, 0, 0, 6, "\6"};
+  void *buf = &sbuf;
+  while (run) {
+    auto l = read(ui, buf, 1514);
+    if (-1 == l || -1 == sendto(socketh, buf, l, 0, (struct sockaddr *)&addr,
+                                sizeof(addr)))
+      break;
   }
-  return 0;
+  return run = 0;
 }
-
-int sendh(void *) {
-
-  struct ifreq ifr = {{"lo"}, {}};
-  assert(ioctl(sockfd, SIOCGIFINDEX, &ifr) != -1 || close(sockfd));
-  struct sockaddr_ll addr = {AF_PACKET, 0, ifr.ifr_ifindex, 0, 0, 6, "\6"};
-  while (!quit) {
-    sbytes += sendto(sockfd, (void *)&sbuf, 1514, 0, (struct sockaddr *)&addr,
-                     sizeof(addr));
-    ++sbuf.seq;
-  }
-  return 0;
-}
-char data;
-u32 loss, seq;
-int recvh(void *) {
-  while (!quit) {
-    u32 r = recvfrom(sockfd, (void *)&rbuf, 1514, 0, 0, 0);
-    if (rbuf.type != 0x9999)
+static int recvh(void *) {
+  void *buf = &rbuf;
+  while (run) {
+    auto l = recvfrom(socketh, (void *)&rbuf, 1514, 0, 0, 0);
+    if (-1 == l)
+      break;
+    if (rbuf.p != 0x1919 && rbuf.src == local)
       continue;
-    rbytes += r;
-    data = *rbuf.data;
-    loss += rbuf.seq - seq - 1;
-    seq = rbuf.seq;
+    if (-1 == write(ui, buf, l))
+      break;
   }
-  return 0;
+  return run = 0;
 }
-int main() {
-  sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-  assert(sockfd != -1);
+int main(int argc, char **argv) {
+  if (argc != 2)
+    return 1;
+  ui = atoi(argv[1]);
+  socketh = socket(AF_PACKET, SOCK_RAW, htons(0x1919));
+  assert(socketh != -1);
+  puts("eth");
 
   signal(SIGINT, sigh);
   signal(SIGTERM, sigh);
-  thrd_t compt, sendt, recvt;
+  thrd_t sendt, recvt;
 #define crthrd(fn) thrd_create(&fn##t, fn##h, 0)
-  crthrd(comp);
   crthrd(send);
   crthrd(recv);
 
-  struct timespec ts = {0, 100000000};
-  while (!quit) {
-    printf("\rsend seq: %10u rate: %10fMbps\trecv seq: %10u rate: %10fMbps\t "
-           "data: %3hhx loss: %10u",
-           sbuf.seq, sbytes * 8e-5, seq, rbytes * 8e-5, data, loss);
-    compcnt = 0, sbytes = 0, rbytes = 0;
-    fflush(stdout);
-    thrd_sleep(&ts, 0);
-  }
-  close(sockfd);
-  thrd_join(compt, 0);
   thrd_join(sendt, 0);
   thrd_join(recvt, 0);
+  close(socketh);
 }
