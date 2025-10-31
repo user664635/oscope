@@ -95,4 +95,6 @@ int main() {
     iter();
   thrd_join(gputhrd, &res);
   thrd_join(recvt, &res);
+  close(sv[0]);
+  close(sv[1]);
 }

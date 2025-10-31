@@ -45,11 +45,11 @@ static int recvh(void *) {
   u16 seq = 0;
   u64 loss = 0;
   while (run) {
-    auto l = recvfrom(socketh, (void *)&rbuf, 1514, 0, 0, 0);
+    auto l = 32;//recvfrom(socketh, (void *)&rbuf, 1514, 0, 0, 0);
     if (-1 == l)
       break;
-    if (rbuf.p != 0x1919 && rbuf.src == local)
-      continue;
+    //if (rbuf.p != 0x1919 && rbuf.src == local)
+    //  continue;
     u16 s = rbuf.seq;
     u64 lo = s - seq - 1;
     loss += lo;
