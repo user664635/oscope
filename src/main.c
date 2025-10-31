@@ -65,6 +65,7 @@ static void iter() {
 }
 
 static int sv[2];
+u8 *pdata;
 int main() {
   if (-1 == socketpair(AF_UNIX, SOCK_STREAM, 0, sv))
     return 1;

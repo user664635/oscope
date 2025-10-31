@@ -107,7 +107,7 @@ static VkDevice crtdev(VkPhysicalDevice pdev) {
   return dev;
 }
 const VkFormat colorfmt = VK_FORMAT_R16G16B16A16_SFLOAT;
-const auto colorspace = VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT;
+const auto colorspace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 #define crtshdinfo(src, stg)                                                   \
   extern const char bin(src, start)[], bin(src, end)[];                        \
   shdinfo.codeSize = bin(src, end) - bin(src, start);                          \
@@ -205,11 +205,12 @@ int gpu(void *) {
       .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
-  VkBuffer asciibuf, instbuf;
+  VkBuffer asciibuf, instbuf, pbuf;
   vkCreateBuffer(dev, &bufinfo, 0, &asciibuf);
   bufinfo.size = 65536;
   bufinfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
   vkCreateBuffer(dev, &bufinfo, 0, &instbuf);
+  vkCreateBuffer(dev, &bufinfo, 0, &pbuf);
 
   vkGetBufferMemoryRequirements(dev, asciibuf, &memreq);
   auto bufmem = memalloc(dev, memreq, memprop, 6);
@@ -223,6 +224,12 @@ int gpu(void *) {
   vkBindBufferMemory(dev, instbuf, uimem, 0);
   vec4 *uidata;
   vkMapMemory(dev, uimem, 0, memreq.size, 0, (void *)&uidata);
+
+  vkGetBufferMemoryRequirements(dev, pbuf, &memreq);
+  auto pmem = memalloc(dev, memreq, memprop, 7);
+  vkBindBufferMemory(dev, pbuf, pmem, 0);
+  extern u8 *pdata;
+  vkMapMemory(dev, pmem, 0, memreq.size, 0, (void *)&pdata);
 
   VkFence fence;
   VkFenceCreateInfo fenceInfo = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -290,22 +297,10 @@ int gpu(void *) {
           .descriptorCount = 1,
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
-      {
-          .binding = 1,
-          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          .descriptorCount = 1,
-          .stageFlags = VK_SHADER_STAGE_ALL,
-      },
-      {
-          .binding = 2,
-          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          .descriptorCount = 1,
-          .stageFlags = VK_SHADER_STAGE_ALL,
-      },
   };
   VkDescriptorSetLayoutCreateInfo desclytinfo = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .bindingCount = 3,
+      .bindingCount = 1,
       .pBindings = desclytbind,
   };
   VkDescriptorSetLayout desclyt;
@@ -316,14 +311,10 @@ int gpu(void *) {
           .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
           .descriptorCount = 1,
       },
-      {
-          .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-          .descriptorCount = 2,
-      },
   };
   VkDescriptorPoolCreateInfo descpoolinfo = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .poolSizeCount = 2,
+      .poolSizeCount = 1,
       .pPoolSizes = descpoolsize,
       .maxSets = 1,
   };
@@ -381,12 +372,13 @@ int gpu(void *) {
   VkShaderModuleCreateInfo shdinfo = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
   };
-  VkVertexInputBindingDescription vertin = {0, 16, VK_VERTEX_INPUT_RATE_VERTEX};
-  VkVertexInputAttributeDescription vertdesc = {
-      0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0};
+  VkVertexInputBindingDescription vertin = {0, 1, VK_VERTEX_INPUT_RATE_VERTEX};
+  VkVertexInputAttributeDescription vertdesc = {0, 0, VK_FORMAT_R8_UNORM, 0};
   VkPipelineVertexInputStateCreateInfo vertinfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount = 1,
       .pVertexBindingDescriptions = &vertin,
+      .vertexAttributeDescriptionCount = 1,
       .pVertexAttributeDescriptions = &vertdesc,
   };
   VkPipelineInputAssemblyStateCreateInfo asminfo = {
@@ -453,9 +445,9 @@ int gpu(void *) {
   crtshdinfo(ui_vert, VERTEX);
   crtshdinfo(ui_frag, FRAGMENT);
   VkPipelineShaderStageCreateInfo uinfo[] = {ui_vert_info, ui_frag_info};
+  vertin.stride = 16;
   vertin.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-  vertinfo.vertexBindingDescriptionCount = 1,
-  vertinfo.vertexAttributeDescriptionCount = 1;
+  vertdesc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
   attch.blendEnable = 1;
   asminfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
   grapinfo.pStages = uinfo;
@@ -588,8 +580,9 @@ int gpu(void *) {
 
     vkCmdBeginRendering(cmdbuf, &rendinfo);
 
-    // vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    // vkCmdDraw(cmdbuf, 0, 1, 0, 0);
+    vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdBindVertexBuffers(cmdbuf, 0, 1, &pbuf, &(usize){0});
+    vkCmdDraw(cmdbuf, 65536, 1, 0, 0);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, uipipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &instbuf, &(usize){0});
