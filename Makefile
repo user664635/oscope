@@ -3,10 +3,10 @@ ARCH = -march=native
 CC = clang
 FLAGS = $(ARCH) -O3 -ffast-math -MMD -MP -Iinc/
 FLAGS += -Rpass-missed=inline
-CFLAGS = $(FLAGS) -std=c2y
+CFLAGS = $(FLAGS) -std=gnu2y
 
-LD = clang -fuse-ld=lld
-LDFLAGS = $(ARCH) -flto
+LD = clang
+LDFLAGS = $(ARCH) -fuse-ld=lld -flto
 LDFLAGS += -Wl,-X,-s,-S,--as-needed,--gc-sections,--icf=all
 LDFLAGS += -lSDL3 -lvulkan -lm
 
@@ -20,6 +20,9 @@ all: $(TARGET)
 	$(TARGET)
 
 build: $(TARGET)
+
+eth: eth.c
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o obj/$@
 
 $(TARGET): $(OBJS)
 	$(LD) $(LDFLAGS) $(OBJS) -o $@
