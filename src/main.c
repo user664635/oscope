@@ -1,7 +1,6 @@
 #include "../inc/def.h"
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_vulkan.h>
-#include <asm-generic/errno.h>
 #include <fcntl.h>
 #include <semaphore.h>
 #include <spawn.h>
@@ -76,7 +75,10 @@ static int recvh(void *p) {
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
   while (!quit) {
-    if (ETIMEDOUT == sem_timedwait(&sm->semr, &ts))
+    sem_timedwait(&sm->semr, &ts);
+    int val;
+    sem_getvalue(&sm->semr, &val);
+    if (!val)
       continue;
     memcpy(pdata, sm->bufr, sizeof(sm->bufr));
   }
@@ -99,9 +101,9 @@ int main() {
     perror("mmap");
     return 1;
   }
+  close(fd);
   sem_init(&p->sems, 1, 0);
   sem_init(&p->semr, 1, 0);
-  close(fd);
   extern void crtwin(), crtinst(), crtsrf();
   extern int gpu(void *);
   crtwin();
