@@ -1,13 +1,16 @@
 #include "inc/def.h"
 #include <arpa/inet.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <netpacket/packet.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <threads.h>
 #include <unistd.h>
 
@@ -17,13 +20,12 @@ static void sigh(int) { quit = 1; }
 static int socketh;
 static const u64 local = 0x222222222222;
 
-static Smem *shm;
-static int sendh(void *) {
+static int sendh(void *p) {
   struct sockaddr_ll addr = {AF_PACKET, 0, 1, 0, 0, 6, "\6"};
-  void *buf = &sbuf;
+  Smem *sm = p;
   while (!quit) {
-    auto l = sendto(socketh, buf, sizeof(sbuf), 0, (struct sockaddr *)&addr,
-                    sizeof(addr));
+    auto l = sendto(socketh, &sm->bufs, sizeof(Head) + 1024, 0,
+                    (struct sockaddr *)&addr, sizeof(addr));
     if (l == -1) {
       perror("sendto");
       break;
@@ -33,23 +35,24 @@ static int sendh(void *) {
   puts("send exit");
   return 0;
 }
-static int recvh(void *) {
+static int recvh(void *p) {
   u16 seq = 0;
   u64 loss = 0;
+  Smem *sm = p;
   while (!quit) {
-    auto l = recvfrom(socketh, (void *)&rbuf, sizeof(rbuf), 0, 0, 0);
+    auto l = recvfrom(socketh, &sm->bufr, sizeof(Head) + 1024, 0, 0, 0);
     if (l == -1) {
       perror("recvfrom");
       break;
     }
-    if (rbuf.p != 0x1919 || rbuf.src == local)
+    if (sm->hr.p != 0x1919 || sm->hr.src == local)
       continue;
-    u16 s = rbuf.seq;
+    u16 s = sm->hr.seq;
     u64 lo = s - seq - 1;
     seq = s;
     loss += lo;
     if (lo)
-      printf("loss:%d\n", loss);
+      printf("loss:%ld\n", loss);
   }
   quit = 1;
   puts("recv exit");
@@ -57,15 +60,27 @@ static int recvh(void *) {
 }
 int main() {
   socketh = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-  assert(socketh != -1);
+  if (socketh == -1) {
+    perror("socket");
+    return 1;
+  }
   puts("eth");
+  int fd = shm_open("oscope", O_RDWR, 0);
+  if (fd == -1) {
+    perror("shm_open");
+    return 1;
+  }
+  Smem *p = mmap(NULL, sizeof(Smem), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (p == MAP_FAILED) {
+    perror("mmap");
+    return 1;
+  }
 
   signal(SIGINT, sigh);
   signal(SIGTERM, sigh);
   thrd_t sendt, recvt;
-#define crthrd(fn) thrd_create(&fn##t, fn##h, 0)
-  crthrd(send);
-  crthrd(recv);
+  thrd_create(&sendt, sendh, p);
+  thrd_create(&recvt, sendh, p);
 
   thrd_join(sendt, 0);
   thrd_join(recvt, 0);

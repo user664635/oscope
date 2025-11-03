@@ -90,12 +90,10 @@ int main() {
     perror("shm_open");
     return 1;
   }
-
   if (ftruncate(fd, sizeof(Smem)) == -1) {
     perror("ftruncate");
     return 1;
   }
-
   Smem *p = mmap(NULL, sizeof(Smem), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (p == MAP_FAILED) {
     perror("mmap");
