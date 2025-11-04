@@ -76,6 +76,7 @@ u8 *pdata;
 static int recvh(void *p) {
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
+  usize i = 0;
   while (!quit) {
     auto v = sem_timedwait(&sm->semr, &ts);
     if (v == -1) {
@@ -86,8 +87,18 @@ static int recvh(void *p) {
         break;
       }
     }
-    memcpy(pdata, sm->bufr, sizeof(sm->bufr));
+    memcpy(pdata + i, sm->bufr, sizeof(sm->bufr));
+    i = i + 1024 & 65535;
   }
+  return 0;
+}
+static int sendh(void *p) {
+  Smem *sm = p;
+  while (!quit) {
+    printf("%f\n", mousepos.x);
+    memset(sm->bufs, mousepos.x, 8192);
+  }
+  quit = 1;
   return 0;
 }
 int main() {
@@ -111,7 +122,6 @@ int main() {
   p->hs.p = 0x1919;
   p->hs.src = 0x2222;
   p->hs.dst = 0x6666;
-  p->hs.p = 0x1919;
 
   signal(SIGINT, sigh);
   signal(SIGTERM, sigh);
@@ -120,14 +130,16 @@ int main() {
   crtwin();
   crtinst();
   crtsrf();
-  thrd_t gputhrd, recvt;
+  thrd_t gputhrd, recvt, sendt;
   thrd_create(&gputhrd, gpu, 0);
   thrd_create(&recvt, recvh, p);
+  thrd_create(&recvt, sendh, p);
   int res;
   while (!quit)
     iter();
   thrd_join(gputhrd, &res);
   thrd_join(recvt, &res);
+  thrd_join(sendt, &res);
   sem_destroy(&p->sems);
   sem_destroy(&p->semr);
   munmap(p, sizeof(Smem));
