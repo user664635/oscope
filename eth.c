@@ -25,8 +25,9 @@ static int sendh(void *p) {
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
   while (!quit) {
-    auto l = sendto(socketh, &sm->hs, sizeof(Head) + 1024, 0,
+    auto l = sendto(socketh, &sm->hs, sizeof(Head) + 8192, 0,
                     (struct sockaddr *)&addr, sizeof(addr));
+    printf("%d\n",sm->bufs[0]);
     if (l == -1) {
       perror("sendto");
       break;
@@ -59,7 +60,6 @@ static int recvh(void *p) {
     if (lo)
       printf("loss:%ld\n", loss);
     memcpy(&sm->bufr, buf.d, l);
-    printf("%ld\n", l);
     sem_post(&sm->semr);
   }
   quit = 1;
