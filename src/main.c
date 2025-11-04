@@ -108,6 +108,10 @@ int main() {
   close(fd);
   sem_init(&p->sems, 1, 0);
   sem_init(&p->semr, 1, 0);
+  p->hs.p = 0x1919;
+  p->hs.src = 0x2222;
+  p->hs.dst = 0x6666;
+  p->hs.p = 0x1919;
 
   signal(SIGINT, sigh);
   signal(SIGTERM, sigh);

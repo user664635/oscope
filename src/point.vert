@@ -1,4 +1,3 @@
-#include <def.glsl>
 layout(location = 0) in float pos;
 void main(){
 	float id = gl_VertexIndex / 32767. - 1;

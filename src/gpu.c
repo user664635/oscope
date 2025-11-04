@@ -512,7 +512,7 @@ int gpu(void *) {
   };
 
   struct {
-    vec2 scl, mp;
+    vec2 scl;
     u32 cnt;
   } cmn;
   extern bool quit;
@@ -528,8 +528,7 @@ int gpu(void *) {
       fc = 0;
       t0 = ts.tv_sec;
     }
-    cmn.scl = 10 / (vec2){w, h};
-    cmn.mp = mousepos * 1e-4;
+    cmn.scl = 4 / (vec2){w, h};
 
     f32 fontw = cmn.scl.x * 8, fonty = 1 - cmn.scl.y * 16;
     char buf[32];

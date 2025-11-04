@@ -21,16 +21,11 @@ static int socketh;
 static const u64 local = 0x222222222222;
 
 static int sendh(void *p) {
-  struct sockaddr_ll addr = {AF_PACKET, 0, 1, 0, 0, 6, "\6"};
+  struct sockaddr_ll addr = {AF_PACKET, 0, 2, 0, 0, 6, "\6"};
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
   while (!quit) {
-    sem_timedwait(&sm->sems, &ts);
-    int val;
-    sem_getvalue(&sm->sems, &val);
-    if (!val)
-      continue;
-    auto l = sendto(socketh, &sm->bufs, sizeof(Head) + 1024, 0,
+    auto l = sendto(socketh, &sm->hs, sizeof(Head) + 1024, 0,
                     (struct sockaddr *)&addr, sizeof(addr));
     if (l == -1) {
       perror("sendto");
@@ -45,10 +40,9 @@ static int recvh(void *p) {
   u16 seq = 0;
   u64 loss = 0;
   Smem *sm = p;
+  u8 buf[2048];
   while (!quit) {
-    auto l = 32; // recvfrom(socketh, &sm->bufr, sizeof(Head) + 1024, 0, 0, 0);
-    memset(&sm->bufr, ++seq, 1024);
-    sem_post(&sm->semr);
+    auto l = recvfrom(socketh, buf, sizeof(Head) + 1024, 0, 0, 0);
     if (l == -1) {
       perror("recvfrom");
       break;
@@ -61,6 +55,8 @@ static int recvh(void *p) {
     loss += lo;
     if (lo)
       printf("loss:%ld\n", loss);
+    memcpy(&sm->bufr, buf, l);
+    sem_post(&sm->semr);
   }
   quit = 1;
   puts("recv exit");
