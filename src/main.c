@@ -40,6 +40,8 @@ static int recvh(void *p) {
 
 static sem_t sendsem;
 vec2 mousepos;
+usize mscnt;
+Line *linedata;
 static int sendh(void *p) {
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
@@ -53,7 +55,14 @@ static int sendh(void *p) {
         break;
       }
     }
-    memset(sm->bufs, mousepos.x * 1024, 8192);
+    Line *lp = linedata + 1024;
+    usize j = 0;
+    for (usize i = 0; i < mscnt; ++i) {
+      f32 jmax = (lp[i].pos.x + I_3) * 3 * 4095;
+      u8 y = (lp[i].pos.y + 1) * 3 * 127;
+      while (j < jmax)
+        sm->bufs[j++] = y;
+    }
     sem_post(&sm->sems);
   }
   quit = 1;
@@ -63,8 +72,6 @@ static int sendh(void *p) {
 f32 pe = -.75, ne = -.5;
 u32 w, h;
 f32 scale;
-Line *linedata;
-usize mscnt;
 int main() {
   int fd = shm_open("oscope", O_CREAT | O_RDWR, 0o666);
   if (fd == -1) {
