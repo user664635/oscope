@@ -17,7 +17,7 @@
 
 static f32 scale;
 vec2 mousepos;
-f32 pe, ne;
+f32 pe = -.75, ne = -.5;
 volatile bool quit;
 static void sigh(int) { quit = 1; }
 u32 w, h;
@@ -39,6 +39,7 @@ static void iter() {
         else if (abs(mousepos.y - ne) < 1e-2)
           ne = mousepos.y;
       }
+      printf("%f\n",ne);
     }
     break;
   case SDL_EVENT_MOUSE_WHEEL:
@@ -91,7 +92,7 @@ static int sendh(void *p) {
         break;
       }
     }
-    memset(sm->bufs, mousepos.x, 8192);
+    memset(sm->bufs, mousepos.x * 1024, 8192);
     sem_post(&sm->sems);
   }
   quit = 1;

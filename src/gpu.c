@@ -242,6 +242,7 @@ int gpu(void *) {
   linedata[linecnt++] = (struct line){{-1, 0, -I_3, 0}, {1, 0, 0, 1}};
   linedata[linecnt++] = (struct line){{-1, -1, -I_3, -1}, {0, 1, 0, 1}};
 
+  linedata[linecnt++] = (struct line){{-1, -2 * I_3, 1, -2 * I_3}, {1, 1, 1, 1}};
   linedata[linecnt++] = (struct line){{-I_3, -1, -I_3, 1}, {1, 1, 1, 1}};
   linedata[linecnt++] = (struct line){{I_3, -1, I_3, 1}, {1, 1, 1, 1}};
   linedata[linecnt++] = (struct line){{-1, 0, I_3, 0}, {1, 1, 1, 1}};
