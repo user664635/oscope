@@ -17,11 +17,10 @@ void crtwin() {
   auto displays = SDL_GetDisplays(0);
   auto modes = SDL_GetCurrentDisplayMode(displays[0]);
   f32 scale = modes->pixel_density;
-  w = 1600, h = 1000;
+  w = 1500, h = 900;
 #define WFLAGS                                                                 \
   SDL_WINDOW_VULKAN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE
-  win = SDL_CreateWindow("test", w, h, WFLAGS);
-  w *= scale, h *= scale;
+  win = SDL_CreateWindow("test", w / scale, h / scale, WFLAGS);
   win || printf("failed to create window: %s\n", SDL_GetError());
 }
 #if VKDBG
@@ -205,12 +204,13 @@ int gpu(void *) {
       .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
-  VkBuffer asciibuf, instbuf, pbuf;
+  VkBuffer asciibuf, instbuf, pbuf, linebuf;
   vkCreateBuffer(dev, &bufinfo, 0, &asciibuf);
   bufinfo.size = 65536;
   bufinfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
   vkCreateBuffer(dev, &bufinfo, 0, &instbuf);
   vkCreateBuffer(dev, &bufinfo, 0, &pbuf);
+  vkCreateBuffer(dev, &bufinfo, 0, &linebuf);
 
   vkGetBufferMemoryRequirements(dev, asciibuf, &memreq);
   auto bufmem = memalloc(dev, memreq, memprop, 6);
@@ -230,6 +230,17 @@ int gpu(void *) {
   vkBindBufferMemory(dev, pbuf, pmem, 0);
   extern u8 *pdata;
   vkMapMemory(dev, pmem, 0, memreq.size, 0, (void *)&pdata);
+
+  vkGetBufferMemoryRequirements(dev, pbuf, &memreq);
+  auto linemem = memalloc(dev, memreq, memprop, 7);
+  vkBindBufferMemory(dev, linebuf, linemem, 0);
+  struct line {
+    vec4 pos, col;
+  } *linedata;
+  vkMapMemory(dev, linemem, 0, memreq.size, 0, (void *)&linedata);
+  usize linecnt = 0;
+  linedata[linecnt++] = (struct line){{0, -1, 0, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (struct line){{-1, 0, 1, 0}, {1, 1, 1, 1}};
 
   VkFence fence;
   VkFenceCreateInfo fenceInfo = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -373,13 +384,16 @@ int gpu(void *) {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
   };
   VkVertexInputBindingDescription vertin = {0, 1, VK_VERTEX_INPUT_RATE_VERTEX};
-  VkVertexInputAttributeDescription vertdesc = {0, 0, VK_FORMAT_R8_UNORM, 0};
+  VkVertexInputAttributeDescription vertdesc[2] = {
+      {0, 0, VK_FORMAT_R8_UNORM, 0},
+      {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 16},
+  };
   VkPipelineVertexInputStateCreateInfo vertinfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
       .vertexBindingDescriptionCount = 1,
       .pVertexBindingDescriptions = &vertin,
       .vertexAttributeDescriptionCount = 1,
-      .pVertexAttributeDescriptions = &vertdesc,
+      .pVertexAttributeDescriptions = vertdesc,
   };
   VkPipelineInputAssemblyStateCreateInfo asminfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -407,7 +421,7 @@ int gpu(void *) {
   };
   VkPipelineColorBlendAttachmentState attch = {
       .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-      .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+      .dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA,
       .colorBlendOp = VK_BLEND_OP_ADD,
       .colorWriteMask = 15,
   };
@@ -437,7 +451,8 @@ int gpu(void *) {
 
   crtshdinfo(point_vert, VERTEX);
   crtshdinfo(point_frag, FRAGMENT);
-  VkPipelineShaderStageCreateInfo pointinfo[] = {point_vert_info, point_frag_info};
+  VkPipelineShaderStageCreateInfo pointinfo[] = {point_vert_info,
+                                                 point_frag_info};
   grapinfo.pStages = pointinfo;
   VkPipeline pointpipe;
   vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &pointpipe);
@@ -448,20 +463,19 @@ int gpu(void *) {
   grapinfo.pStages = lineinfo;
   vertin.stride = 32;
   vertin.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-  vertdesc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  vertinfo.vertexAttributeDescriptionCount = 2;
+  vertdesc->format = VK_FORMAT_R32G32B32A32_SFLOAT;
   asminfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
   grapinfo.pStages = lineinfo;
   VkPipeline linepipe;
   vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &linepipe);
-
-
 
   crtshdinfo(ui_vert, VERTEX);
   crtshdinfo(ui_frag, FRAGMENT);
   VkPipelineShaderStageCreateInfo uinfo[] = {ui_vert_info, ui_frag_info};
   vertin.stride = 16;
   vertin.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-  vertdesc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  vertinfo.vertexAttributeDescriptionCount = 1;
   attch.blendEnable = 1;
   asminfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
   grapinfo.pStages = uinfo;
@@ -595,6 +609,10 @@ int gpu(void *) {
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pointpipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &pbuf, &(usize){0});
     vkCmdDraw(cmdbuf, 65536, 1, 0, 0);
+
+    vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linepipe);
+    vkCmdBindVertexBuffers(cmdbuf, 0, 1, &linebuf, &(usize){0});
+    vkCmdDraw(cmdbuf, 2, linecnt, 0, 0);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, uipipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &instbuf, &(usize){0});

@@ -27,7 +27,6 @@ static int sendh(void *p) {
   while (!quit) {
     auto l = sendto(socketh, &sm->hs, sizeof(Head) + 8192, 0,
                     (struct sockaddr *)&addr, sizeof(addr));
-    printf("%d\n",sm->bufs[0]);
     if (l == -1) {
       perror("sendto");
       break;
@@ -42,9 +41,9 @@ static int recvh(void *p) {
   u64 loss = 0;
   Smem *sm = p;
   struct {
-	  Head h;
-	  u8 d[1024];
-  }buf;
+    Head h;
+    u8 d[1024];
+  } buf;
   while (!quit) {
     auto l = recvfrom(socketh, &buf, sizeof(Head) + 1024, 0, 0, 0);
     if (l == -1) {
