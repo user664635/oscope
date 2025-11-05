@@ -17,7 +17,7 @@ void crtwin() {
   auto displays = SDL_GetDisplays(0);
   auto modes = SDL_GetCurrentDisplayMode(displays[0]);
   f32 scale = modes->pixel_density;
-  w = 1600, h = 1024;
+  w = 1800, h = 1024;
 #define WFLAGS                                                                 \
   SDL_WINDOW_VULKAN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE
   win = SDL_CreateWindow("test", w / scale, h / scale, WFLAGS);
@@ -239,8 +239,13 @@ int gpu(void *) {
   } *linedata;
   vkMapMemory(dev, linemem, 0, memreq.size, 0, (void *)&linedata);
   usize linecnt = 0;
-  linedata[linecnt++] = (struct line){{0, -1, 0, 1}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{-1, 0, 1, 0}, {1, 1, 1, 1}};
+  const f32 I_3 = 1 / 3.;
+  linedata[linecnt++] = (struct line){{-I_3, -1, -I_3, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (struct line){{I_3, -1, I_3, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (struct line){{-1, 0, I_3, 0}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (struct line){{-1, -I_3, I_3, -I_3}, {1, 1, 1, 1}};
+  linedata[linecnt++] =
+      (struct line){{-1, 1 - I_3, I_3, 1 - I_3}, {1, 1, 1, 1}};
 
   VkFence fence;
   VkFenceCreateInfo fenceInfo = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
