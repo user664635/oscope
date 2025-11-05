@@ -437,10 +437,19 @@ int gpu(void *) {
 
   crtshdinfo(point_vert, VERTEX);
   crtshdinfo(point_frag, FRAGMENT);
-  VkPipelineShaderStageCreateInfo stginfo[] = {point_vert_info, point_frag_info};
-  grapinfo.pStages = stginfo;
-  VkPipeline pipeline;
-  vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &pipeline);
+  VkPipelineShaderStageCreateInfo pointinfo[] = {point_vert_info, point_frag_info};
+  grapinfo.pStages = pointinfo;
+  VkPipeline pointpipe;
+  vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &pointpipe);
+
+  crtshdinfo(line_vert, VERTEX);
+  crtshdinfo(line_frag, FRAGMENT);
+  VkPipelineShaderStageCreateInfo lineinfo[] = {line_vert_info, line_frag_info};
+  grapinfo.pStages = lineinfo;
+  VkPipeline linepipe;
+  vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &linepipe);
+
+
 
   crtshdinfo(ui_vert, VERTEX);
   crtshdinfo(ui_frag, FRAGMENT);
@@ -579,7 +588,7 @@ int gpu(void *) {
 
     vkCmdBeginRendering(cmdbuf, &rendinfo);
 
-    vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pointpipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &pbuf, &(usize){0});
     vkCmdDraw(cmdbuf, 65536, 1, 0, 0);
 

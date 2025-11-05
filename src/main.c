@@ -95,7 +95,6 @@ static int recvh(void *p) {
 static int sendh(void *p) {
   Smem *sm = p;
   while (!quit) {
-    printf("%f\n", mousepos.x);
     memset(sm->bufs, mousepos.x, 8192);
   }
   quit = 1;
@@ -133,7 +132,7 @@ int main() {
   thrd_t gputhrd, recvt, sendt;
   thrd_create(&gputhrd, gpu, 0);
   thrd_create(&recvt, recvh, p);
-  thrd_create(&recvt, sendh, p);
+  thrd_create(&sendt, sendh, p);
   int res;
   while (!quit)
     iter();

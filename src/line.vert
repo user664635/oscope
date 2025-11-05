@@ -1,6 +1,8 @@
-layout(location = 0) in float pos;
+layout(location = 0) in vec4 pos;
+layout(location = 1) in vec4 color;
+layout(location = 0) out vec4 col;
 void main(){
-	float id = gl_VertexIndex / 32767. - 1;
-	gl_PointSize = 1;
-  gl_Position = vec4(id,pos,0,1);
+	col = color;
+	vec2 p = gl_VertexIndex == 0 ? pos.xy : pos.zw;
+  gl_Position = vec4(p,0,1);
 }
