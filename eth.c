@@ -1,4 +1,5 @@
 #include "inc/def.h"
+#include <errno.h>
 #include <arpa/inet.h>
 #include <assert.h>
 #include <fcntl.h>
@@ -25,9 +26,17 @@ static int sendh(void *p) {
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
   while (!quit) {
+    auto v = sem_timedwait(&sm->sems, &ts);
+    if (v == -1) {
+      if (errno == ETIMEDOUT)
+        continue;
+      else {
+        perror("sem");
+        break;
+      }
+    }
     auto l = sendto(socketh, &sm->hs, sizeof(Head) + 8192, 0,
                     (struct sockaddr *)&addr, sizeof(addr));
-    printf("%d\n",sm->bufs[0]);
     if (l == -1) {
       perror("sendto");
       break;
@@ -42,9 +51,9 @@ static int recvh(void *p) {
   u64 loss = 0;
   Smem *sm = p;
   struct {
-	  Head h;
-	  u8 d[1024];
-  }buf;
+    Head h;
+    u8 d[1024];
+  } buf;
   while (!quit) {
     auto l = recvfrom(socketh, &buf, sizeof(Head) + 1024, 0, 0, 0);
     if (l == -1) {

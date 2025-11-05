@@ -14,31 +14,13 @@
 #include <unistd.h>
 #include <vulkan/vulkan_core.h>
 
-static vec3 dir;
 static f32 scale;
 vec2 mousepos;
+f32 pe, ne;
 volatile bool quit;
 static void sigh(int) { quit = 1; }
-#define inputdir(d)                                                            \
-  case 'w':                                                                    \
-    dir.z += d;                                                                \
-    break;                                                                     \
-  case 's':                                                                    \
-    dir.z -= d;                                                                \
-    break;                                                                     \
-  case 'a':                                                                    \
-    dir.x -= d;                                                                \
-    break;                                                                     \
-  case 'd':                                                                    \
-    dir.x += d;                                                                \
-    break;                                                                     \
-  case ' ':                                                                    \
-    dir.y -= d;                                                                \
-    break;                                                                     \
-  case 'c':                                                                    \
-    dir.y += d;                                                                \
-    break;
 u32 w, h;
+sem_t sendsem;
 static void iter() {
   SDL_Event event;
   SDL_WaitEvent(&event);
@@ -47,10 +29,11 @@ static void iter() {
     quit = 1;
     return;
   case SDL_EVENT_MOUSE_MOTION:
-    mousepos.x += event.motion.xrel;
-    mousepos.y += event.motion.yrel;
-    mousepos = min(mousepos, (vec2){w, h});
-    mousepos = max(mousepos, (vec2){});
+    mousepos.x = event.motion.x;
+    mousepos.y = event.motion.y;
+    printf("%f,%f\n", mousepos.x, mousepos.y);
+    if (event.motion.state & 1) {
+    }
     break;
   case SDL_EVENT_MOUSE_WHEEL:
     scale += event.wheel.y * 50;
@@ -59,15 +42,12 @@ static void iter() {
     if (event.key.repeat)
       break;
     switch (event.key.key) {
-      inputdir(1);
+    case '\r':
+      sem_post(&sendsem);
+      break;
     case 'h':
       quit = 1;
     }
-    break;
-  case SDL_EVENT_KEY_UP:
-    if (event.key.repeat)
-      break;
-    switch (event.key.key) { inputdir(-1); }
     break;
   }
 }
@@ -88,14 +68,25 @@ static int recvh(void *p) {
       }
     }
     memcpy(pdata + i, sm->bufr, sizeof(sm->bufr));
-    i = i + 1024 & 65535;
+    i = i + 1024 & 1048575;
   }
   return 0;
 }
 static int sendh(void *p) {
   Smem *sm = p;
+  struct timespec ts = {0, 1000000};
   while (!quit) {
+    auto v = sem_timedwait(&sendsem, &ts);
+    if (v == -1) {
+      if (errno == ETIMEDOUT)
+        continue;
+      else {
+        perror("sem");
+        break;
+      }
+    }
     memset(sm->bufs, mousepos.x, 8192);
+    sem_post(&sm->sems);
   }
   quit = 1;
   return 0;
@@ -118,6 +109,7 @@ int main() {
   close(fd);
   sem_init(&p->sems, 1, 0);
   sem_init(&p->semr, 1, 0);
+  sem_init(&sendsem, 0, 0);
   p->hs.p = 0x1919;
   p->hs.src = 0x2222;
   p->hs.dst = 0x6666;
