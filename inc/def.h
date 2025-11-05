@@ -27,6 +27,9 @@ typedef struct {
   Head hr;
   u8 bufr[1024];
 } Smem;
+typedef struct {
+  vec4 pos, col;
+} Line;
 
 #define exp __builtin_elementwise_exp
 #define sin __builtin_elementwise_sin

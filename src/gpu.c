@@ -234,19 +234,17 @@ int gpu(void *) {
   vkGetBufferMemoryRequirements(dev, pbuf, &memreq);
   auto linemem = memalloc(dev, memreq, memprop, 7);
   vkBindBufferMemory(dev, linebuf, linemem, 0);
-  struct line {
-    vec4 pos, col;
-  } *linedata;
+  extern Line *linedata;
   vkMapMemory(dev, linemem, 0, memreq.size, 0, (void *)&linedata);
   usize linecnt = 0;
-  linedata[linecnt++] = (struct line){{-1, 0, -I_3, 0}, {1, 0, 0, 1}};
-  linedata[linecnt++] = (struct line){{-1, -1, -I_3, -1}, {0, 1, 0, 1}};
+  linedata[linecnt++] = (Line){{-1, 0, -I_3, 0}, {1, 0, 0, 1}};
+  linedata[linecnt++] = (Line){{-1, -1, -I_3, -1}, {0, 1, 0, 1}};
 
-  linedata[linecnt++] = (struct line){{-1, -2 * I_3, 1, -2 * I_3}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{-I_3, -1, -I_3, 1}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{I_3, -1, I_3, 1}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{-1, 0, I_3, 0}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{-1, -I_3, I_3, -I_3}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{-1, -2 * I_3, I_3, -2 * I_3}, {.5, .5, .5, 1}};
+  linedata[linecnt++] = (Line){{-I_3, -1, -I_3, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{I_3, -1, I_3, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{-1, 0, I_3, 0}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{-1, -I_3, I_3, -I_3}, {1, 1, 1, 1}};
 
   VkFence fence;
   VkFenceCreateInfo fenceInfo = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -570,8 +568,8 @@ int gpu(void *) {
     sprintf(buf, "fps:%lu", fps);
     display(uidata, &uicnt, -1, fonty, fontw, buf);
 
-    linedata[0].pos.yw = (vec2){pe,pe};
-    linedata[1].pos.yw = (vec2){ne,ne};
+    linedata[0].pos.yw = (vec2){pe, pe};
+    linedata[1].pos.yw = (vec2){ne, ne};
 
     vkWaitForFences(dev, 1, &fence, 1, -1);
     vkResetFences(dev, 1, &fence);
@@ -623,6 +621,8 @@ int gpu(void *) {
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linepipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &linebuf, &(usize){0});
     vkCmdDraw(cmdbuf, 2, linecnt, 0, 0);
+    extern usize mscnt;
+    vkCmdDraw(cmdbuf, 2, mscnt,0,1024);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, uipipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &instbuf, &(usize){0});

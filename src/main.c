@@ -15,50 +15,8 @@
 #include <unistd.h>
 #include <vulkan/vulkan_core.h>
 
-static f32 scale;
-vec2 mousepos;
-f32 pe = -.75, ne = -.5;
 volatile bool quit;
 static void sigh(int) { quit = 1; }
-u32 w, h;
-sem_t sendsem;
-static void iter() {
-  SDL_Event event;
-  SDL_WaitEvent(&event);
-  switch (event.type) {
-  case SDL_EVENT_QUIT:
-    quit = 1;
-    return;
-  case SDL_EVENT_MOUSE_MOTION:
-    mousepos.x = event.motion.x / w * 2 - 1;
-    mousepos.y = event.motion.y / h * 2 - 1;
-    if (event.motion.state & 1) {
-      if (mousepos.x < -I_3) {
-        if (abs(mousepos.y - pe) < 1e-2)
-          pe = mousepos.y;
-        else if (abs(mousepos.y - ne) < 1e-2)
-          ne = mousepos.y;
-      }
-      printf("%f\n",ne);
-    }
-    break;
-  case SDL_EVENT_MOUSE_WHEEL:
-    scale += event.wheel.y * 50;
-    break;
-  case SDL_EVENT_KEY_DOWN:
-    if (event.key.repeat)
-      break;
-    switch (event.key.key) {
-    case '\r':
-      sem_post(&sendsem);
-      break;
-    case 'h':
-      quit = 1;
-    }
-    break;
-  }
-}
-
 u8 *pdata;
 static int recvh(void *p) {
   Smem *sm = p;
@@ -79,6 +37,9 @@ static int recvh(void *p) {
   }
   return 0;
 }
+
+static sem_t sendsem;
+vec2 mousepos;
 static int sendh(void *p) {
   Smem *sm = p;
   struct timespec ts = {0, 1000000};
@@ -98,6 +59,12 @@ static int sendh(void *p) {
   quit = 1;
   return 0;
 }
+
+f32 pe = -.75, ne = -.5;
+u32 w, h;
+f32 scale;
+Line *linedata;
+usize mscnt;
 int main() {
   int fd = shm_open("oscope", O_CREAT | O_RDWR, 0o666);
   if (fd == -1) {
@@ -133,8 +100,63 @@ int main() {
   thrd_create(&recvt, recvh, p);
   thrd_create(&sendt, sendh, p);
   int res;
-  while (!quit)
-    iter();
+
+  bool ctrl = 0;
+  vec2 pms = 0;
+  while (!quit) {
+    Line *lp = linedata + 1024;
+    SDL_Event event;
+    SDL_WaitEvent(&event);
+    switch (event.type) {
+    case SDL_EVENT_QUIT:
+      quit = 1;
+      break;
+    case SDL_EVENT_MOUSE_MOTION:
+      mousepos.x = event.motion.x / w * 2 - 1;
+      mousepos.y = event.motion.y / h * 2 - 1;
+      if (event.motion.state & 1) {
+        if (mousepos.x < -I_3) {
+          if (abs(mousepos.y - pe) < 1e-2)
+            pe = mousepos.y;
+          else if (abs(mousepos.y - ne) < 1e-2)
+            ne = mousepos.y;
+        }
+      }
+      vec2 ms = min(max((vec2){-I_3, -1}, mousepos), (vec2){I_3, -I_3});
+      ms.x = max(pms.x, ms.x);
+      if (ctrl)
+        lp[mscnt++] = (Line){{pms.x, pms.y, ms.x, ms.y}, {1, 0, 1, 1}};
+      pms = ms;
+      break;
+    case SDL_EVENT_MOUSE_WHEEL:
+      scale += event.wheel.y * 50;
+      break;
+    case SDL_EVENT_KEY_UP:
+      switch (event.key.key) {
+      case SDLK_LCTRL:
+        ctrl = 0;
+        sem_post(&sendsem);
+        break;
+      }
+      break;
+    case SDL_EVENT_KEY_DOWN:
+      if (event.key.repeat)
+        break;
+      switch (event.key.key) {
+      case '\r':
+        sem_post(&sendsem);
+        break;
+      case SDLK_LCTRL:
+        ctrl = 1;
+        pms.x = -I_3;
+        mscnt = 0;
+        break;
+      case 'h':
+        quit = 1;
+      }
+      break;
+    }
+  }
   thrd_join(gputhrd, &res);
   thrd_join(recvt, &res);
   thrd_join(sendt, &res);
