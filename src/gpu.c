@@ -446,6 +446,11 @@ int gpu(void *) {
   crtshdinfo(line_frag, FRAGMENT);
   VkPipelineShaderStageCreateInfo lineinfo[] = {line_vert_info, line_frag_info};
   grapinfo.pStages = lineinfo;
+  vertin.stride = 32;
+  vertin.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+  vertdesc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  asminfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+  grapinfo.pStages = lineinfo;
   VkPipeline linepipe;
   vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &linepipe);
 
@@ -460,7 +465,6 @@ int gpu(void *) {
   attch.blendEnable = 1;
   asminfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
   grapinfo.pStages = uinfo;
-  grapinfo.subpass = 1;
   VkPipeline uipipe;
   vkCreateGraphicsPipelines(dev, 0, 1, &grapinfo, 0, &uipipe);
 
