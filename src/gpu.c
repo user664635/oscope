@@ -630,8 +630,8 @@ int gpu(void *) {
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &linebuf, &(usize){0});
     vkCmdDraw(cmdbuf, 2, linecnt, 0, 0);
     extern usize mscnt;
-    vkCmdDraw(cmdbuf, 2, mscnt, 0, 1024);
-    vkCmdDraw(cmdbuf, 2, FFT_N, 0, 512);
+    vkCmdDraw(cmdbuf, 2, mscnt, 0, 4096);
+    vkCmdDraw(cmdbuf, 2, FFT_N, 0, 1024);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, uipipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &instbuf, &(usize){0});

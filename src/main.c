@@ -57,10 +57,10 @@ static int ffth(void *) {
         break;
       }
     }
-    Line *lfp = linedata + 512;
+    Line *lfp = linedata + 1024;
     c32 out[n];
     fft(pdata + trig, out);
-    constexpr f32 a = 1. / n / 32;
+    const f32 a = SQRT2_2 / n / 32;
     for (usize i = 0; i < n; ++i) {
       f32 x = i * I2_3 / n - 1;
       f32 y = __builtin_cabs(out[i]) * -I_3 * a;
@@ -127,7 +127,7 @@ static int sendh(void *p) {
         break;
       }
     }
-    Line *lp = linedata + 1024;
+    Line *lp = linedata + 4096;
     usize j = 0;
     for (usize i = 0; i < mscnt; ++i) {
       f32 jmax = (lp[i].pos.x + I_3) * 3 * 4096;
@@ -185,7 +185,6 @@ int main() {
   bool ctrl = 0;
   vec2 pms = 0;
   while (!quit) {
-    Line *lp = linedata + 1024;
     SDL_Event event;
     SDL_WaitEvent(&event);
     switch (event.type) {
@@ -205,6 +204,7 @@ int main() {
       }
       vec2 ms = min(max((vec2){-I_3, -1}, mousepos), (vec2){I_3, -I_3});
       ms.x = max(pms.x, ms.x);
+      Line *lp = linedata + 4096;
       if (ctrl)
         lp[mscnt++] = (Line){{pms.x, pms.y, ms.x, ms.y}, {1, 0, 1, 1}};
       pms = ms;

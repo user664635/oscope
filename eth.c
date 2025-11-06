@@ -23,8 +23,9 @@ static int socketh;
 static int sendh(void *p) {
   struct sockaddr_ll addr = {AF_PACKET, 0, 2, 0, 0, 6, "\6"};
   Smem *sm = p;
+  struct timespec ts = {0, 1000000};
   while (!quit) {
-    auto v = sem_timedwait(&sm->sems, &ms1);
+    auto v = sem_timedwait(&sm->sems, &ts);
     if (v == -1) {
       if (errno == ETIMEDOUT)
         continue;
