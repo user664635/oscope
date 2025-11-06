@@ -544,6 +544,7 @@ int gpu(void *) {
 
   struct {
     vec2 scl;
+    f32 scale;
     u32 cnt;
   } cmn;
   extern bool quit;
@@ -561,15 +562,19 @@ int gpu(void *) {
       t0 = ts.tv_sec;
     }
     cmn.scl = 4 / (vec2){w, h};
+    extern f32 scale;
+    cmn.scale = 1 / scale;
 
     f32 fontw = cmn.scl.x * 8, fonty = 1 - cmn.scl.y * 16;
     char buf[32];
     usize uicnt = 1;
-    sprintf(buf, "fps:%lu", fps);
+    sprintf(buf, "fps:%lu, scale:%f", fps, scale);
     display(uidata, &uicnt, -1, fonty, fontw, buf);
 
     linedata[0].pos.yw = (vec2){pe, pe};
     linedata[1].pos.yw = (vec2){ne, ne};
+
+    usize pcnt = scale * 2 / 3;
 
     vkWaitForFences(dev, 1, &fence, 1, -1);
     vkResetFences(dev, 1, &fence);
@@ -616,7 +621,7 @@ int gpu(void *) {
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pointpipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &pbuf, &(usize){0});
-    vkCmdDraw(cmdbuf, 1048576, 1, 0, 0);
+    vkCmdDraw(cmdbuf, pcnt & 1048575, 1, 0, 0);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linepipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &linebuf, &(usize){0});

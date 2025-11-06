@@ -58,8 +58,8 @@ static int sendh(void *p) {
     Line *lp = linedata + 1024;
     usize j = 0;
     for (usize i = 0; i < mscnt; ++i) {
-      f32 jmax = (lp[i].pos.x + I_3) * 3 * 4095;
-      u8 y = (lp[i].pos.y + 1) * 3 * 127;
+      f32 jmax = (lp[i].pos.x + I_3) * 3 * 4096;
+      u8 y = (lp[i].pos.y + 1) * 3 * 128;
       while (j < jmax)
         sm->bufs[j++] = y;
     }
@@ -71,7 +71,7 @@ static int sendh(void *p) {
 
 f32 pe = -.75, ne = -.5;
 u32 w, h;
-f32 scale;
+f32 scale = 1;
 int main() {
   int fd = shm_open("oscope", O_CREAT | O_RDWR, 0o666);
   if (fd == -1) {
@@ -136,7 +136,8 @@ int main() {
       pms = ms;
       break;
     case SDL_EVENT_MOUSE_WHEEL:
-      scale += event.wheel.y * 50;
+      scale *= 1 + event.wheel.y;
+      scale = max(1.f, scale);
       break;
     case SDL_EVENT_KEY_UP:
       switch (event.key.key) {
