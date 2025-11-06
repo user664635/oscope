@@ -630,6 +630,7 @@ int gpu(void *) {
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &linebuf, &(usize){0});
     vkCmdDraw(cmdbuf, 2, linecnt, 0, 0);
     vkCmdDraw(cmdbuf, 2, FFT_N, 0, 1024);
+    vkCmdDraw(cmdbuf, 2, 8192, 0, 2048);
     extern usize mscnt;
     vkCmdDraw(cmdbuf, 2, mscnt, 0, 10240);
 

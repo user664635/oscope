@@ -115,8 +115,8 @@ static int recvh(void *p) {
 static sem_t sendsem;
 vec2 mousepos;
 usize mscnt;
-static bool sendn;
-static f32 fun(f32 x) { return x; }
+static bool sendm;
+static f32 fun(f32 x) { return sin(x * PI); }
 static int sendh(void *p) {
   Smem *sm = p;
   while (!quit) {
@@ -129,13 +129,27 @@ static int sendh(void *p) {
         break;
       }
     }
-    Line *lp = linedata + 10240;
-    usize j = 0;
-    for (usize i = 0; i < mscnt; ++i) {
-      f32 jmax = (lp[i].pos.x + I_3) * 3 * 4096;
-      u8 y = (lp[i].pos.y + 1) * 3 * 128;
-      while (j < jmax)
-        sm->bufs[j++] = y;
+    Line *lp = linedata;
+    if (sendm) {
+      lp += 2048;
+      f32 y0 = 0, x0 = -I_3;
+      for (usize i = 0; i < 8192; ++i) {
+        f32 t = i / 8192.;
+        f32 x = t * I2_3 - I_3;
+        f32 y = fun(t);
+        sm->bufs[i] = y * 256;
+        lp[i] = (Line){{x0, y0, x, y}, {0, 1, 1, 1}};
+        x0 = x, y0 = y;
+      }
+    } else {
+      lp += 10240;
+      usize j = 0;
+      for (usize i = 0; i < mscnt; ++i) {
+        f32 jmax = (lp[i].pos.x + I_3) * 3 * 4096;
+        u8 y = (lp[i].pos.y + 1) * 3 * 128;
+        while (j < jmax)
+          sm->bufs[j++] = y;
+      }
     }
     sem_post(&sm->sems);
   }
@@ -219,6 +233,11 @@ int main() {
       switch (event.key.key) {
       case SDLK_LCTRL:
         ctrl = 0;
+        sendm = 0;
+        sem_post(&sendsem);
+        break;
+      case 's':
+        sendm = 1;
         sem_post(&sendsem);
         break;
       }
