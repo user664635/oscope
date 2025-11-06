@@ -19,14 +19,12 @@ static volatile bool quit;
 static void sigh(int) { quit = 1; }
 
 static int socketh;
-static const u64 local = 0x222222222222;
 
 static int sendh(void *p) {
   struct sockaddr_ll addr = {AF_PACKET, 0, 2, 0, 0, 6, "\6"};
   Smem *sm = p;
-  struct timespec ts = {0, 1000000};
   while (!quit) {
-    auto v = sem_timedwait(&sm->sems, &ts);
+    auto v = sem_timedwait(&sm->sems, &ms1);
     if (v == -1) {
       if (errno == ETIMEDOUT)
         continue;

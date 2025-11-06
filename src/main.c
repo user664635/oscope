@@ -165,8 +165,8 @@ int main() {
   sem_init(&sendsem, 0, 0);
   sem_init(&fftsem, 0, 0);
   p->hs.p = 0x1919;
-  p->hs.src = 0x2222;
-  p->hs.dst = 0x6666;
+  p->hs.src = local;
+  p->hs.dst = -1;
 
   signal(SIGINT, sigh);
   signal(SIGTERM, sigh);

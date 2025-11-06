@@ -34,6 +34,7 @@ typedef struct {
 } Line;
 
 constexpr struct timespec ms1 = {0, 1000000};
+constexpr u64 local = 0x222222222222;
 
 #define exp __builtin_elementwise_exp
 #define sin __builtin_elementwise_sin
