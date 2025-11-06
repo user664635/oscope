@@ -134,10 +134,11 @@ static int sendh(void *p) {
       lp += 2048;
       f32 y0 = 0, x0 = -I_3;
       for (usize i = 0; i < 8192; ++i) {
-        f32 t = i / 8192.;
-        f32 x = t * I2_3 - I_3;
-        f32 y = fun(t);
-        sm->bufs[i] = y * 256;
+        f32 t = i / 4096. - 1;
+        f32 x = t * I_3;
+        f32 y = fun(t) + 1;
+        sm->bufs[i] = y * 128;
+	y *= I_3;
         lp[i] = (Line){{x0, y0, x, y}, {0, 1, 1, 1}};
         x0 = x, y0 = y;
       }
@@ -183,6 +184,7 @@ int main() {
   p->hs.p = 0x1919;
   p->hs.src = local;
   p->hs.dst = -1;
+  p->hs.seq = 1;
 
   signal(SIGINT, sigh);
   signal(SIGTERM, sigh);
@@ -192,7 +194,7 @@ int main() {
   crtinst();
   crtsrf();
   thrd_t gputhrd, recvt, sendt, fftt;
-  thrd_create(&gputhrd, gpu, 0);
+  thrd_create(&gputhrd, gpu, p);
   thrd_create(&fftt, ffth, 0);
   thrd_create(&recvt, recvh, p);
   thrd_create(&sendt, sendh, p);
@@ -228,6 +230,8 @@ int main() {
     case SDL_EVENT_MOUSE_WHEEL:
       scale *= 1 + event.wheel.y;
       scale = max(1.f, scale);
+      p->hs.seq += event.wheel.x * 256;
+      sem_post(&sendsem);
       break;
     case SDL_EVENT_KEY_UP:
       switch (event.key.key) {

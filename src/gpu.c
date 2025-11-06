@@ -152,7 +152,7 @@ static f32 display(vec4 *ui, usize *cnt, f32 x, f32 y, f32 w, char *buf) {
   }
   return x;
 }
-int gpu(void *) {
+int gpu(void *p) {
   auto pdev = selpdev(inst);
   auto dev = crtdev(pdev);
   VkQueue devque;
@@ -553,6 +553,7 @@ int gpu(void *) {
   u32 idx;
   time_t t0 = 0, fc = 0, fps;
   while (!quit) {
+    Smem *sm = p;
     ++fc;
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
@@ -570,7 +571,7 @@ int gpu(void *) {
     f32 fontw = cmn.scl.x * 8, fonty = 1 - cmn.scl.y * 16;
     char buf[32];
     usize uicnt = 1;
-    sprintf(buf, "fps:%lu, scale:%f", fps, scale);
+    sprintf(buf, "fps:%lu, div:%u, scale:%f", fps, sm->hs.seq, scale);
     display(uidata, &uicnt, -1, fonty, fontw, buf);
 
     linedata[0].pos.yw = (vec2){pe, pe};
