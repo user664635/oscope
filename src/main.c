@@ -20,14 +20,35 @@ static void sigh(int) { quit = 1; }
 u8 *pdata;
 f32 pe = -I2_3 - .125, ne = -I2_3 + .125;
 usize trig;
-static int recvh(void *p) {
-  Smem *sm = p;
-  struct timespec ts = {0, 1000000};
-  usize i = 0, stat = 0;
+static constexpr usize n = FFT_N;
+static constexpr usize logn = __builtin_ctz(n);
+static usize rev[n];
+static c32 rot[n];
+void fft_init() {
+  for (usize i = 0; i < n; ++i)
+    rev[i] = __builtin_bitreverse32(i) >> (32 - logn),
+    rot[i] = __builtin_cexp(-2i * PI * i / n);
+}
+void fft(u8 const *restrict in, c32 *restrict out) {
+  for (usize i = 0; i < n; ++i)
+    out[rev[i]] = in[i];
+  for (usize i = 0; i < logn; ++i) {
+    int m = 1 << i;
+    for (usize j = 0; j < n; j += m << 1)
+      for (int k = 0; k < m; ++k) {
+        c32 t = rot[k << (logn - i - 1)] * out[j + k + m];
+        c32 u = out[j + k];
+        out[j + k] = u + t;
+        out[j + k + m] = u - t;
+      }
+  }
+}
+Line *linedata;
+static sem_t fftsem;
+static int ffth(void *) {
+  fft_init();
   while (!quit) {
-    auto v = sem_timedwait(&sm->semrc, &ts);
-    u16 pt = -128 - pe * 384;
-    u16 nt = -128 - ne * 384;
+    auto v = sem_timedwait(&fftsem, &ms1);
     if (v == -1) {
       if (errno == ETIMEDOUT)
         continue;
@@ -36,21 +57,51 @@ static int recvh(void *p) {
         break;
       }
     }
+    Line *lfp = linedata + 512;
+    c32 out[n];
+    fft(pdata + trig, out);
+    constexpr f32 a = 1. / n / 32;
+    for (usize i = 0; i < n; ++i) {
+      f32 x = i * I2_3 / n - 1;
+      f32 y = __builtin_cabs(out[i]) * -I_3 * a;
+      f32 r = __builtin_creal(out[i]) * a;
+      f32 g = __builtin_cimag(out[i]) * a;
+      lfp[i] = (Line){{x, 0, x, y}, {r, g, 1, 1}};
+    }
+  }
+  return 0;
+}
+static int recvh(void *p) {
+  Smem *sm = p;
+  usize i = 0, stat = 0;
+  while (!quit) {
+    auto v = sem_timedwait(&sm->semrc, &ms1);
+    if (v == -1) {
+      if (errno == ETIMEDOUT)
+        continue;
+      else {
+        perror("sem");
+        break;
+      }
+    }
+    u16 pt = -128 - pe * 384;
+    u16 nt = -128 - ne * 384;
     for (usize j = 0; j < 1024; ++j) {
       u16 val = sm->bufr[j];
       pdata[i + j] = val;
       switch (stat) {
       case 0:
         stat += val < nt;
-	break;
+        break;
       case 1:
         stat += val > pt;
-	break;
+        break;
       case 2:
-	++stat;
+        ++stat;
         trig = i + j;
       }
     }
+    sem_post(&fftsem);
     sem_post(&sm->semrp);
     i += 1024;
     if (i > 1048575) {
@@ -64,12 +115,10 @@ static int recvh(void *p) {
 static sem_t sendsem;
 vec2 mousepos;
 usize mscnt;
-Line *linedata;
 static int sendh(void *p) {
   Smem *sm = p;
-  struct timespec ts = {0, 1000000};
   while (!quit) {
-    auto v = sem_timedwait(&sendsem, &ts);
+    auto v = sem_timedwait(&sendsem, &ms1);
     if (v == -1) {
       if (errno == ETIMEDOUT)
         continue;
@@ -114,6 +163,7 @@ int main() {
   sem_init(&p->semrp, 1, 1);
   sem_init(&p->semrc, 1, 0);
   sem_init(&sendsem, 0, 0);
+  sem_init(&fftsem, 0, 0);
   p->hs.p = 0x1919;
   p->hs.src = 0x2222;
   p->hs.dst = 0x6666;
@@ -125,8 +175,9 @@ int main() {
   crtwin();
   crtinst();
   crtsrf();
-  thrd_t gputhrd, recvt, sendt;
+  thrd_t gputhrd, recvt, sendt, fftt;
   thrd_create(&gputhrd, gpu, 0);
+  thrd_create(&fftt, ffth, 0);
   thrd_create(&recvt, recvh, p);
   thrd_create(&sendt, sendh, p);
   int res;
@@ -191,9 +242,12 @@ int main() {
   thrd_join(gputhrd, &res);
   thrd_join(recvt, &res);
   thrd_join(sendt, &res);
+  thrd_join(fftt, &res);
   sem_destroy(&p->sems);
   sem_destroy(&p->semrp);
   sem_destroy(&p->semrc);
+  sem_destroy(&sendsem);
+  sem_destroy(&fftsem);
   munmap(p, sizeof(Smem));
   shm_unlink("oscope");
 }

@@ -8,3 +8,4 @@
 #define SQRT3 1.73205080756887729352
 #define I_3 (1 / 3.)
 #define I2_3 (2 / 3.)
+#define FFT_N 1024

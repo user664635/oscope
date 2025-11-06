@@ -4,6 +4,8 @@
 #include <time.h>
 
 typedef float f32;
+typedef _Complex float c32;
+
 typedef double f64;
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -30,6 +32,8 @@ typedef struct {
 typedef struct {
   vec4 pos, col;
 } Line;
+
+constexpr struct timespec ms1 = {0, 1000000};
 
 #define exp __builtin_elementwise_exp
 #define sin __builtin_elementwise_sin
