@@ -544,7 +544,7 @@ int gpu(void *) {
 
   struct {
     vec2 scl;
-    f32 scale;
+    f32 scale, trig;
     u32 cnt;
   } cmn;
   extern bool quit;
@@ -564,6 +564,9 @@ int gpu(void *) {
     cmn.scl = 4 / (vec2){w, h};
     extern f32 scale;
     cmn.scale = 1 / scale;
+    extern usize trig;
+    cmn.trig = trig / scale;
+    printf("%lu\n",trig);
 
     f32 fontw = cmn.scl.x * 8, fonty = 1 - cmn.scl.y * 16;
     char buf[32];
@@ -622,8 +625,6 @@ int gpu(void *) {
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pointpipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &pbuf, &(usize){0});
     vkCmdDraw(cmdbuf, pcnt & 1048575, 1, 0, 0);
-    extern usize trig;
-    printf("%lu\n",trig);
     vkCmdDraw(cmdbuf, pcnt - trig & 1048575, 1, trig, 1);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linepipe);

@@ -18,7 +18,7 @@
 volatile bool quit;
 static void sigh(int) { quit = 1; }
 u8 *pdata;
-f32 pe = -I2_3, ne = -I2_3;
+f32 pe = -I2_3 + .125, ne = -I2_3 - .125;
 usize trig;
 static int recvh(void *p) {
   Smem *sm = p;
