@@ -56,13 +56,17 @@ static int recvh(void *p) {
   } buf;
   struct timespec ts = {0, 1000000};
   while (!quit) {
-    auto l = recvfrom(socketh, &buf, sizeof(Head) + 1024, 0, 0, 0);
+    auto l = recvfrom(socketh, &buf, 1514, 0, 0, 0);
     if (l == -1) {
       perror("recvfrom");
       break;
     }
     if (buf.h.p != 0x1919 || buf.h.src == local)
       continue;
+    if (l < 1040) {
+      puts("l");
+      continue;
+    }
     u16 s = buf.h.seq;
     u16 lo = s - seq - 1;
     seq = s;
@@ -82,7 +86,7 @@ static int recvh(void *p) {
         break;
       }
     }
-    memcpy(&sm->bufr, buf.d, l);
+    memcpy(&sm->bufr, buf.d, 1024);
     sem_post(&sm->semrc);
   }
   quit = 1;
