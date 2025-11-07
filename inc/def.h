@@ -4,6 +4,8 @@
 #include <time.h>
 
 typedef float f32;
+typedef _Complex float c32;
+
 typedef double f64;
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -21,18 +23,25 @@ typedef struct {
   u128 dst : 48, src : 48, p : 16, seq : 16;
 } Head;
 typedef struct {
-  sem_t sems, semr;
+  sem_t sems, semrp, semrc;
   Head hs;
   u8 bufs[8192];
   Head hr;
   u8 bufr[1024];
 } Smem;
+typedef struct {
+  vec4 pos, col;
+} Line;
+
+constexpr struct timespec ms1 = {0, 1000000};
+constexpr u64 local = 0x222222222222;
 
 #define exp __builtin_elementwise_exp
 #define sin __builtin_elementwise_sin
 #define cos __builtin_elementwise_cos
 #define min __builtin_elementwise_min
 #define max __builtin_elementwise_max
+#define abs __builtin_elementwise_abs
 
 #define dumps(x) __builtin_dump_struct(&x, printf)
 #define bin(id, s) _binary_obj_##id##_spv_##s

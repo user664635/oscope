@@ -17,7 +17,7 @@ void crtwin() {
   auto displays = SDL_GetDisplays(0);
   auto modes = SDL_GetCurrentDisplayMode(displays[0]);
   f32 scale = modes->pixel_density;
-  w = 1800, h = 1024;
+  w = 1800, h = 768;
 #define WFLAGS                                                                 \
   SDL_WINDOW_VULKAN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE
   win = SDL_CreateWindow("test", w / scale, h / scale, WFLAGS);
@@ -152,7 +152,7 @@ static f32 display(vec4 *ui, usize *cnt, f32 x, f32 y, f32 w, char *buf) {
   }
   return x;
 }
-int gpu(void *) {
+int gpu(void *p) {
   auto pdev = selpdev(inst);
   auto dev = crtdev(pdev);
   VkQueue devque;
@@ -234,19 +234,17 @@ int gpu(void *) {
   vkGetBufferMemoryRequirements(dev, pbuf, &memreq);
   auto linemem = memalloc(dev, memreq, memprop, 7);
   vkBindBufferMemory(dev, linebuf, linemem, 0);
-  struct line {
-    vec4 pos, col;
-  } *linedata;
+  extern Line *linedata;
   vkMapMemory(dev, linemem, 0, memreq.size, 0, (void *)&linedata);
   usize linecnt = 0;
-  const f32 I_3 = 1 / 3.;
-  linedata[linecnt++] = (struct line){{-1, 0, -I_3, 0}, {1, 0, 0, 1}};
-  linedata[linecnt++] = (struct line){{-1, -1, -I_3, -1}, {0, 1, 0, 1}};
+  linedata[linecnt++] = (Line){{-1, 0, -I_3, 0}, {1, 0, 0, 1}};
+  linedata[linecnt++] = (Line){{-1, -1, -I_3, -1}, {0, 1, 0, 1}};
 
-  linedata[linecnt++] = (struct line){{-I_3, -1, -I_3, 1}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{I_3, -1, I_3, 1}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{-1, 0, I_3, 0}, {1, 1, 1, 1}};
-  linedata[linecnt++] = (struct line){{-1, -I_3, I_3, -I_3}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{-1, -2 * I_3, I_3, -2 * I_3}, {.5, .5, .5, 1}};
+  linedata[linecnt++] = (Line){{-I_3, -1, -I_3, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{I_3, -1, I_3, 1}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{-1, 0, I_3, 0}, {1, 1, 1, 1}};
+  linedata[linecnt++] = (Line){{-1, -I_3, I_3, -I_3}, {1, 1, 1, 1}};
 
   VkFence fence;
   VkFenceCreateInfo fenceInfo = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -546,6 +544,7 @@ int gpu(void *) {
 
   struct {
     vec2 scl;
+    f32 scale, trig;
     u32 cnt;
   } cmn;
   extern bool quit;
@@ -554,6 +553,7 @@ int gpu(void *) {
   u32 idx;
   time_t t0 = 0, fc = 0, fps;
   while (!quit) {
+    Smem *sm = p;
     ++fc;
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
@@ -562,16 +562,24 @@ int gpu(void *) {
       fc = 0;
       t0 = ts.tv_sec;
     }
-    cmn.scl = 4 / (vec2){w, h};
+    cmn.scl = 2 / (vec2){w, h};
+    extern f32 scale;
+    cmn.scale = 1 / scale;
+    extern usize trig;
+    cmn.trig = trig / scale;
 
     f32 fontw = cmn.scl.x * 8, fonty = 1 - cmn.scl.y * 16;
     char buf[32];
     usize uicnt = 1;
-    sprintf(buf, "fps:%lu", fps);
+    sprintf(buf, "fps:%lu, div:%u, scale:%f", fps, sm->hs.seq, scale);
     display(uidata, &uicnt, -1, fonty, fontw, buf);
+    extern char ibuf[];
+    display(uidata, &uicnt, -I_3, -I_3, fontw, ibuf);
 
-    linedata[0].pos.yw = (vec2){pe,pe};
-    linedata[1].pos.yw = (vec2){ne,ne};
+    linedata[0].pos.yw = (vec2){pe, pe};
+    linedata[1].pos.yw = (vec2){ne, ne};
+
+    usize pcnt = scale * 2 / 3;
 
     vkWaitForFences(dev, 1, &fence, 1, -1);
     vkResetFences(dev, 1, &fence);
@@ -618,11 +626,16 @@ int gpu(void *) {
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pointpipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &pbuf, &(usize){0});
-    vkCmdDraw(cmdbuf, 1048576, 1, 0, 0);
+    vkCmdDraw(cmdbuf, pcnt & 1048575, 1, 0, 0);
+    vkCmdDraw(cmdbuf, pcnt & 1048575, 1, trig, 1);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linepipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &linebuf, &(usize){0});
     vkCmdDraw(cmdbuf, 2, linecnt, 0, 0);
+    vkCmdDraw(cmdbuf, 2, FFT_N, 0, 1024);
+    vkCmdDraw(cmdbuf, 2, 8192, 0, 2048);
+    extern usize mscnt;
+    vkCmdDraw(cmdbuf, 2, mscnt, 0, 10240);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, uipipe);
     vkCmdBindVertexBuffers(cmdbuf, 0, 1, &instbuf, &(usize){0});

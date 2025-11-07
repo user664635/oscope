@@ -1,7 +1,7 @@
 #include "inc/def.h"
-#include <errno.h>
 #include <arpa/inet.h>
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <net/ethernet.h>
 #include <net/if.h>
@@ -19,7 +19,6 @@ static volatile bool quit;
 static void sigh(int) { quit = 1; }
 
 static int socketh;
-static const u64 local = 0x222222222222;
 
 static int sendh(void *p) {
   struct sockaddr_ll addr = {AF_PACKET, 0, 2, 0, 0, 6, "\6"};
@@ -54,22 +53,40 @@ static int recvh(void *p) {
     Head h;
     u8 d[1024];
   } buf;
+  struct timespec ts = {0, 1000000};
   while (!quit) {
-    auto l = recvfrom(socketh, &buf, sizeof(Head) + 1024, 0, 0, 0);
+    auto l = recvfrom(socketh, &buf, 1514, 0, 0, 0);
     if (l == -1) {
       perror("recvfrom");
       break;
     }
     if (buf.h.p != 0x1919 || buf.h.src == local)
       continue;
+    if (l < 1040) {
+      puts("l");
+      continue;
+    }
     u16 s = buf.h.seq;
-    u64 lo = s - seq - 1;
+    u16 lo = s - seq - 1;
     seq = s;
     loss += lo;
     if (lo)
       printf("loss:%ld\n", loss);
-    memcpy(&sm->bufr, buf.d, l);
-    sem_post(&sm->semr);
+
+  wait:
+    if (quit)
+      break;
+    auto v = sem_timedwait(&sm->semrp, &ts);
+    if (v == -1) {
+      if (errno == ETIMEDOUT)
+        goto wait;
+      else {
+        perror("sem");
+        break;
+      }
+    }
+    memcpy(&sm->bufr, buf.d, 1024);
+    sem_post(&sm->semrc);
   }
   quit = 1;
   puts("recv exit");

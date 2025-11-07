@@ -16,13 +16,13 @@ DEPS = $(wildcard obj/*.d)
 
 TARGET = obj/main
 
-all: $(TARGET)
+all: $(TARGET) obj/eth
 	$(TARGET)
 
 build: $(TARGET)
 
-eth: eth.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -o obj/$@
+obj/eth: eth.c
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
 
 $(TARGET): $(OBJS)
 	$(LD) $(LDFLAGS) $(OBJS) -o $@
