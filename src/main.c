@@ -169,7 +169,7 @@ static int sendh(void *p) {
       f32 y0 = 0, x0 = -I_3;
       for (usize i = 0; i < 8192; ++i) {
         f32 t = i / 4096. - 1;
-	fnvart = t;
+        fnvart = t;
         f32 x = t * I_3;
         f32 y = fun() + 1;
         sm->bufs[i] = y * 128;
@@ -211,15 +211,21 @@ void compile() {
       for (int i = 0; i < 2; ++i)
         if (!strncmp(p0, fns[i], p1 - p0))
           op = i;
+      code[codecnt].op = 0;
       switch (op) {
       case 0:
-        code[codecnt++] = (Code){
-            .op = 0,
-            .dst = regcnt,
-        };
+        code[codecnt++].dst = regcnt++;
+        break;
+      case 1:
+        u32 imm = reg[regcnt].imm;
+        code[codecnt].imm0 = imm;
+        if (imm)
+          code[codecnt].i0 = reg[regcnt].num;
+        else
+          code[codecnt].r0 = regcnt - 1;
+        code[codecnt++].dst = regcnt - 1;
         break;
       }
-
     } else {
       reg[regcnt++] = (Reg){1, val};
     }
