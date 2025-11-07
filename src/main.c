@@ -139,18 +139,72 @@ static Code code[64];
 static f32 fnvart;
 static f32 fnt(f32, f32) { return fnvart; }
 static f32 fnsin(f32 x, f32) { return sin(x); }
-static f32 (*fns[])(f32, f32) = {fnt, fnsin};
+static f32 fnabs(f32 x, f32) { return abs(x); }
+static f32 fnl(f32 x, f32 y) { return x > y; }
+static f32 fnadd(f32 x, f32 y) { return x + y; }
+static f32 (*fns[])(f32, f32) = {fnt, fnsin, fnabs, fnl, fnadd};
 static f32 fun() {
   f32 reg[64];
   for (usize i = 0; i < codecnt; ++i) {
     Code c = code[i];
-    // printf("code:%x,%x,%x,%x\n", c.op, c.dst, c.r0, c.r1);
     f32 op0 = c.imm0 ? c.i0 : reg[c.r0];
     f32 op1 = c.imm1 ? c.i1 : reg[c.r1];
     reg[c.dst] = fns[c.op](op0, op1);
   }
 
   return reg[0];
+}
+char ibuf[64];
+void compile() {
+  char *p0 = ibuf, *p1 = p0;
+  char *fns[] = {"t", "s", "a", ">", "+"};
+  Reg reg[64];
+  usize regcnt = 0;
+  codecnt = 0;
+  while (*p1) {
+    f32 val = strtof(p0, &p1);
+    printf("start:%ld\n", regcnt);
+    if (p0 == p1) {
+      while (*p1 && *p1++ != ' ')
+        ;
+      int op = -1;
+      for (int i = 0; i < 4; ++i)
+        if (!strncmp(p0, fns[i], p1 - p0 - 1))
+          op = i;
+      printf("s:%s\tcnt:%ld\top:%d\n", p0, p1 - p0, op);
+      switch (op) {
+      case 0:
+        code[codecnt++] = (Code){.op = 0, .dst = regcnt++};
+        break;
+      case 1: {
+        Code c = {.op = 1};
+        u32 imm = reg[regcnt - 1].imm;
+        c.imm0 = imm;
+        if (imm)
+          c.i0 = reg[regcnt - 1].num;
+        else
+          c.r0 = regcnt - 1;
+        c.dst = regcnt - 1;
+        code[codecnt++] = c;
+      } break;
+      case 2: {
+        Code c = {.op = 2};
+        u32 imm = reg[regcnt - 1].imm;
+        c.imm0 = imm;
+        if (imm)
+          c.i0 = reg[regcnt - 1].num;
+        else
+          c.r0 = regcnt - 1;
+        c.dst = regcnt - 1;
+        code[codecnt++] = c;
+      } break;
+      }
+    } else {
+      reg[regcnt++] = (Reg){1, val};
+    }
+    printf("end:%ld, cnt:%ld\n", regcnt, codecnt);
+    p0 = p1;
+  }
 }
 static int sendh(void *p) {
   Smem *sm = p;
@@ -196,47 +250,6 @@ static int sendh(void *p) {
 
 u32 w, h;
 f32 scale = 2048;
-char ibuf[64];
-void compile() {
-  char *p0 = ibuf, *p1 = p0;
-  char *fns[] = {"t", "sin"};
-  Reg reg[64];
-  usize regcnt = 0;
-  codecnt = 0;
-  while (*p1) {
-    f32 val = strtof(p0, &p1);
-    printf("start:%ld\n", regcnt);
-    if (p0 == p1) {
-      while (*p1 && *p1++ != ' ')
-        ;
-      int op = -1;
-      for (int i = 0; i < 2; ++i)
-        if (!strncmp(p0, fns[i], p1 - p0 - 1))
-          op = i;
-      printf("s:%s\tcnt:%ld\top:%d\n", p0, p1 - p0, op);
-      switch (op) {
-      case 0:
-        code[codecnt++] = (Code){.op = 0, .dst = regcnt++};
-        break;
-      case 1:
-        Code c = {.op = 1};
-        u32 imm = reg[regcnt - 1].imm;
-        c.imm0 = imm;
-        if (imm)
-          c.i0 = reg[regcnt - 1].num;
-        else
-          c.r0 = regcnt - 1;
-        c.dst = regcnt - 1;
-        code[codecnt++] = c;
-        break;
-      }
-    } else {
-      reg[regcnt++] = (Reg){1, val};
-    }
-    printf("end:%ld, cnt:%ld\n", regcnt, codecnt);
-    p0 = p1;
-  }
-}
 int main() {
   int fd = shm_open("oscope", O_CREAT | O_RDWR, 0o666);
   if (fd == -1) {
