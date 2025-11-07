@@ -118,7 +118,8 @@ static sem_t sendsem;
 vec2 mousepos;
 usize mscnt;
 static bool sendm;
-static struct {
+static usize codecnt;
+typedef struct {
   u32 op : 16, imm0 : 1, imm1 : 1;
   u32 dst;
   union {
@@ -129,8 +130,27 @@ static struct {
     u32 r1;
     f32 i1;
   };
-} code[32];
-static f32 fun(f32 x) { return sin(x * PI); }
+} Code;
+typedef struct {
+  u32 imm;
+  f32 num;
+} Reg;
+static Code code[64];
+static f32 fnvart;
+static f32 fnt(f32, f32) { return fnvart; }
+static f32 fnsin(f32 x, f32) { return sin(x); }
+static f32 (*fns[])(f32, f32) = {fnt, fnsin};
+static f32 fun() {
+  f32 reg[64];
+  for (usize i = 0; i < codecnt; ++i) {
+    Code c = code[i];
+    f32 op0 = c.imm0 ? c.i0 : reg[c.r0];
+    f32 op1 = c.imm1 ? c.i1 : reg[c.r1];
+    reg[c.dst] = fns[c.op](op0, op1);
+  }
+
+  return reg[0];
+}
 static int sendh(void *p) {
   Smem *sm = p;
   while (!quit) {
@@ -149,8 +169,9 @@ static int sendh(void *p) {
       f32 y0 = 0, x0 = -I_3;
       for (usize i = 0; i < 8192; ++i) {
         f32 t = i / 4096. - 1;
+	fnvart = t;
         f32 x = t * I_3;
-        f32 y = fun(t) + 1;
+        f32 y = fun() + 1;
         sm->bufs[i] = y * 128;
         y *= I_3;
         lp[i] = (Line){{x0, y0, x, y}, {0, 1, 1, 1}};
@@ -178,16 +199,29 @@ char ibuf[64];
 void compile() {
   char *p0 = ibuf, *p1 = p0;
   char *fns[] = {"t", "sin"};
+  usize regcnt = 0;
+  codecnt = 0;
+  Reg reg[64];
   while (*p1) {
     f32 val = strtof(p0, &p1);
     if (p0 == p1) {
       while (*p1 && *p1 != ' ')
         ++p1;
+      int op = -1;
       for (int i = 0; i < 2; ++i)
         if (!strncmp(p0, fns[i], p1 - p0))
-          printf("%d\n", i);
+          op = i;
+      switch (op) {
+      case 0:
+        code[codecnt++] = (Code){
+            .op = 0,
+            .dst = regcnt,
+        };
+        break;
+      }
+
     } else {
-      printf("%f\n", val);
+      reg[regcnt++] = (Reg){1, val};
     }
     p0 = p1;
   }
