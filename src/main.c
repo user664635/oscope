@@ -258,11 +258,11 @@ int main() {
       break;
     case SDL_EVENT_KEY_DOWN:
       auto key = event.key.key;
-      if (icnt > 62)
-        continue;
-      if (key > 31 && key < 127) {
+      if (key == '\b' && icnt > 0)
+        ibuf[--icnt] = 0;
+      if (key > 31 && key < 127 && icnt < 62) {
         ibuf[icnt++] = key;
-	ibuf[icnt] = 0;
+        ibuf[icnt] = 0;
       }
       if (event.key.repeat)
         break;
