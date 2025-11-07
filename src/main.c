@@ -138,7 +138,7 @@ typedef struct {
 static Code code[64];
 static f32 fnvart;
 static f32 fnt(f32, f32) { return fnvart; }
-static f32 fnsin(f32 x, f32) { return sin(x); }
+static f32 fnsin(f32 x, f32) { return sin(x * PI); }
 static f32 fnabs(f32 x, f32) { return abs(x); }
 static f32 fnl(f32 x, f32 y) { return x > y; }
 static f32 fnadd(f32 x, f32 y) { return x + y; }
@@ -157,7 +157,7 @@ static f32 fun() {
 char ibuf[64];
 void compile() {
   char *p0 = ibuf, *p1 = p0;
-  char *fns[] = {"t", "s", "a", ">", "+"};
+  char *fns[] = {"t", "s", "a", ".", "="};
   Reg reg[64];
   usize regcnt = 0;
   codecnt = 0;
@@ -167,6 +167,10 @@ void compile() {
     if (p0 == p1) {
       while (*p1 && *p1++ != ' ')
         ;
+      if (p1 - p0 == 1){
+	      ++p0;
+	      continue;
+      }
       int op = -1;
       for (int i = 0; i < 4; ++i)
         if (!strncmp(p0, fns[i], p1 - p0 - 1))
@@ -195,6 +199,23 @@ void compile() {
           c.i0 = reg[regcnt - 1].num;
         else
           c.r0 = regcnt - 1;
+        c.dst = regcnt - 1;
+        code[codecnt++] = c;
+      } break;
+      case 3: {
+        Code c = {.op = 3};
+        u32 imm = reg[--regcnt - 1].imm;
+        c.imm0 = imm;
+        if (imm)
+          c.i0 = reg[regcnt - 1].num;
+        else
+          c.r0 = regcnt - 1;
+	imm = reg[regcnt].imm;
+        c.imm1 = imm;
+        if (imm)
+          c.i1 = reg[regcnt].num;
+        else
+          c.r1 = regcnt;
         c.dst = regcnt - 1;
         code[codecnt++] = c;
       } break;
